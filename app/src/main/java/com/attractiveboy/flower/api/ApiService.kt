@@ -15,4 +15,7 @@ interface ApiService {
 
     @GET("wms/receiptOrder/list")
     fun getReceiptOrderList(@QueryMap params: Map<String, String>): Call<ResponseBody>
+
+    @GET("wms/receiptOrder/get-receipt-order-info")
+    fun getReceiptOrderDetail(@QueryMap id: Long): Call<ResponseBody>
 }

@@ -1,69 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F5F5F5">
+    android:layout_height="match_parent">
 
-    <!-- 搜索框区域 -->
     <LinearLayout
+        android:id="@+id/searchLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:elevation="2dp"
-        android:background="#FFFFFF">
+        android:padding="8dp"
+        app:layout_constraintTop_toTopOf="parent">
 
         <EditText
             android:id="@+id/searchInput"
             android:layout_width="0dp"
-            android:layout_height="45dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/search_background"
-            android:drawableStart="@drawable/ic_search"
-            android:drawablePadding="8dp"
-            android:hint="搜索入库单号"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:textSize="14sp"
-            android:textColorHint="#9E9E9E"/>
+            android:hint="请输入入库单号"
+            android:padding="8dp" />
 
         <Button
             android:id="@+id/searchButton"
             android:layout_width="wrap_content"
-            android:layout_height="45dp"
-            android:layout_marginStart="8dp"
-            android:text="搜索"
-            android:textSize="14sp"
-            android:backgroundTint="@color/colorPrimary"/>
+            android:layout_height="wrap_content"
+            android:text="搜索" />
     </LinearLayout>
 
-    <!-- 入库单列表 -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        app:layout_constraintTop_toBottomOf="@id/searchLayout"
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/inboundList"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="8dp"
-            android:clipToPadding="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+            android:visibility="visible" />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <!-- 添加一个空视图 -->
     <TextView
         android:id="@+id/emptyView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:text="暂无数据"
-        android:textSize="16sp"
-        android:textColor="#9E9E9E"
-        android:visibility="gone"/>
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

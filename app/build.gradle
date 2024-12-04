@@ -63,4 +63,8 @@ dependencies {
 
     // Kotlin Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3' // Latest stable version
+
+    // ZXing 条码扫描库
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.4.1'
 }

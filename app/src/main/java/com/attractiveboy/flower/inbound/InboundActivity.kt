@@ -1,11 +1,13 @@
 package com.attractiveboy.flower.inbound
 
+import InboundAdapter
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.attractiveboy.flower.api.ApiService
@@ -18,6 +20,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
 import retrofit2.HttpException
 import retrofit2.Response
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 class InboundActivity : AppCompatActivity() {
     private lateinit var binding: ActivityInboundBinding
@@ -26,7 +29,7 @@ class InboundActivity : AppCompatActivity() {
     private var isLoading = false
     private var hasMoreData = true
     private var currentKeyword: String? = null
-    private lateinit var inboundAdapter: InboundAdapter
+    private lateinit var inboundAdapter: InboundAdapter<InboundOrder>
     private val inboundList = mutableListOf<InboundOrder>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +41,7 @@ class InboundActivity : AppCompatActivity() {
         RetrofitClient.init(this)
 
         setupUI()
+        setupSwipeRefresh()
         loadInboundData()
     }
 
@@ -47,35 +51,45 @@ class InboundActivity : AppCompatActivity() {
         
         // 设置RecyclerView
         binding.inboundList.apply {
-            layoutManager = LinearLayoutManager(this@InboundActivity)
-            adapter = inboundAdapter
+            // 确保设置固定大小
+            setHasFixedSize(true)
+            
+            // 使用线性布局管理器
+            layoutManager = LinearLayoutManager(this@InboundActivity).also {
+                Log.d("InboundAdapter", "LayoutManager set")
+            }
+            
+            // 设置适配器
+            adapter = inboundAdapter.also {
+                Log.d("InboundAdapter", "Adapter set")
+            }
+            
+            // 添加分割线
+            addItemDecoration(DividerItemDecoration(context, DividerItemDecoration.VERTICAL))
+            
+            // 确保可见性
+            visibility = View.VISIBLE
+
+            // 添加滚动监听器实现触底加载
             addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                     super.onScrolled(recyclerView, dx, dy)
+                    
                     val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-                    val visibleItemCount = layoutManager.childCount
+                    val lastVisibleItemPosition = layoutManager.findLastVisibleItemPosition()
                     val totalItemCount = layoutManager.itemCount
-                    val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
 
-                    if (!isLoading && hasMoreData) {
-                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
-                            && firstVisibleItemPosition >= 0) {
-                            loadMoreData()
-                        }
+                    // 当滑动到最后一个item，且不在加载中，且还有更多数据时，触发加载
+                    if (lastVisibleItemPosition == totalItemCount - 1 && !isLoading && hasMoreData) {
+                        loadMoreData()
                     }
                 }
             })
         }
-        
-        // 设置下拉刷新
-        binding.swipeRefresh.setOnRefreshListener {
-            resetAndRefresh()
-        }
+    }
 
-        // 设置搜索
-        binding.searchButton.setOnClickListener {
-            val keyword = binding.searchInput.text.toString().trim()
-            currentKeyword = if (keyword.isNotEmpty()) keyword else null
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh.setOnRefreshListener {
             resetAndRefresh()
         }
     }
@@ -99,9 +113,6 @@ class InboundActivity : AppCompatActivity() {
         if (isLoading) return
         
         isLoading = true
-        if (currentPage == 1) {
-            binding.swipeRefresh.isRefreshing = true
-        }
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -117,24 +128,27 @@ class InboundActivity : AppCompatActivity() {
 
                         // 解析数据并添加到列表
                         val gson = Gson()
-                        val newOrders = mutableListOf<InboundOrder>()
-                        rows.forEach { element ->
-                            val order = gson.fromJson(element, InboundOrder::class.java)
-                            newOrders.add(order)
-                        }
                         
-                        // 如果是第一页,清空原有数据
+                        // 清空列表（如果是第一页）
                         if (currentPage == 1) {
                             inboundList.clear()
                         }
-                        inboundList.addAll(newOrders)
                         
-                        // 更新适配器
+                        // 添加新数据
+                        rows.forEach { element ->
+                            val order = gson.fromJson(element, InboundOrder::class.java)
+                            inboundList.add(order)
+                            Log.d("InboundAdapter", "Added order: $order")
+                        }
+                        
+                        // 通知适配器数据变化
                         inboundAdapter.notifyDataSetChanged()
                         
-                        // 更新空视图状态
-                        binding.emptyView.visibility = if (inboundList.isEmpty()) View.VISIBLE else View.GONE
+                        // 更新UI状态
                         binding.inboundList.visibility = if (inboundList.isEmpty()) View.GONE else View.VISIBLE
+                        binding.emptyView.visibility = if (inboundList.isEmpty()) View.VISIBLE else View.GONE
+                        
+                        Log.d("InboundAdapter", "Data loaded, list size: ${inboundList.size}")
                         
                         // 判断是否还有更多数据
                         hasMoreData = inboundList.size < total
@@ -168,7 +182,7 @@ class InboundActivity : AppCompatActivity() {
     suspend fun getReceiptOrderList(
         orderNo: String? = null,
         orderStatus: String? = null,
-        pageSize: Int = 10,
+        pageSize: Int = 2,
         pageNum: Int = 1,
         orderByColumn: String? = null,
         isAsc: String? = null

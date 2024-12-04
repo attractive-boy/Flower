@@ -15,6 +15,9 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
+            android:name=".inbound.InboundDetailActivity"
+            android:exported="false" />
+        <activity
             android:name=".outbound.OutboundActivity"
             android:exported="false" />
         <activity
