@@ -1,18 +1,28 @@
 package com.attractiveboy.flower.inbound
 
+import PendingBarcodeAdapter
+import WarehousedBarcodeAdapter
+import WarehousedItem
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.attractiveboy.flower.R
 import com.attractiveboy.flower.api.ApiService
 import com.attractiveboy.flower.databinding.ActivityInboundDetailBinding
+import com.attractiveboy.flower.inbound.BarcodeAdapter
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
-import com.google.zxing.common.BitMatrix
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,58 +31,262 @@ import okhttp3.ResponseBody
 import retrofit2.HttpException
 import retrofit2.Response
 
+data class OrderDetail(
+    val itemName: String,
+    val skuName: String, 
+    val itemSerialNumber: String,
+    val itemStatus: String,
+    val skuId: Int,
+    val quantity: Int = 1,
+    val warehouseId: Int? = null,
+    val optType: Int? = null
+)
+
+data class OrderResponse(
+    val id: Long,
+    val orderNo: String,
+    val optType: Int,
+    val createTime: String,
+    val remark: String,
+    val warehouseId: Int,
+    val details: List<OrderDetail>
+)
+
+data class InboundOrder(
+    val id: Long,
+    val orderNo: String,
+    val optType: Int,
+    val createTime: String,
+    val remark: String?,
+    val warehouseId: String
+)
+
+data class BarcodeItem(
+    val barcode: String,
+    val itemName: String?,
+    val skuName: String?,
+    val status: String,
+    val bitmap: Bitmap
+)
+
 class InboundDetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityInboundDetailBinding
     private var inboundOrder: InboundOrder? = null
+    private var orderDetails: List<OrderDetail> = emptyList()
     private val apiService: ApiService = RetrofitClient.instance.create(ApiService::class.java)
+    private lateinit var scannedBarcodeAdapter: BarcodeAdapter
+    private lateinit var warehousedBarcodeAdapter: BarcodeAdapter
+    private val scannedBarcodes = mutableListOf<BarcodeItem>()
+    private val warehousedBarcodes = mutableListOf<BarcodeItem>()
+    private lateinit var pendingAdapter: PendingBarcodeAdapter
+    private lateinit var warehousedAdapter: WarehousedBarcodeAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityInboundDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 从Intent中获取订单ID
-        val orderId = intent.getLongExtra("order_id", -1L)
+        val orderId = intent.getStringExtra("inbound_order")
         
-        if (orderId == -1L) {
+        if (orderId == null) {
             Toast.makeText(this, "获取订单ID失败", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        // 初始化RetrofitClient
         RetrofitClient.init(this)
+        setupRecyclerViews()
+        setupBarcodeScan()
+        setupButtons()
+        
+        // Load order details
+        lifecycleScope.launch {
+            loadOrderDetail(orderId)
+        }
 
-        // 加载订单详情
-        loadOrderDetail(orderId)
-
-        // 设置返回按钮
         binding.toolbar.setNavigationOnClickListener {
-            finish()
+            showExitConfirmDialog()
+        }
+
+        // 初始化待入库列表
+        val rvScannedList = findViewById<RecyclerView>(R.id.rvScannedList)
+        pendingAdapter = PendingBarcodeAdapter()
+        rvScannedList.apply {
+            layoutManager = LinearLayoutManager(this@InboundDetailActivity)
+            adapter = pendingAdapter
+        }
+
+        // 初始化已入库列表
+        val rvWarehousedList = findViewById<RecyclerView>(R.id.rvWarehousedList)
+        warehousedAdapter = WarehousedBarcodeAdapter()
+        rvWarehousedList.apply {
+            layoutManager = LinearLayoutManager(this@InboundDetailActivity)
+            adapter = warehousedAdapter
         }
     }
 
-    private fun loadOrderDetail(orderId: Long) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val result = getReceiptOrderDetail(orderId)
-                result.onSuccess { jsonObject ->
+    private fun setupRecyclerViews() {
+        scannedBarcodeAdapter = BarcodeAdapter()
+        warehousedBarcodeAdapter = BarcodeAdapter()
+        
+        binding.rvScannedList.apply {
+            layoutManager = LinearLayoutManager(this@InboundDetailActivity)
+            adapter = scannedBarcodeAdapter
+        }
+        
+        binding.rvWarehousedList.apply {
+            layoutManager = LinearLayoutManager(this@InboundDetailActivity)
+            adapter = warehousedBarcodeAdapter
+        }
+    }
+
+    private fun setupBarcodeScan() {
+        binding.etBarcode.setOnEditorActionListener { v, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_DONE || 
+                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+                val barcode = v?.text.toString().trim()
+                if (barcode.isNotEmpty()) {
+                    handleScannedBarcode(barcode)
+                    v?.text = ""
+                }
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun setupButtons() {
+        binding.btnSubmit.setOnClickListener {
+            if (scannedBarcodes.isEmpty()) {
+                Toast.makeText(this, "请先扫描条码", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            submitWarehousing()
+        }
+    }
+
+    private fun handleScannedBarcode(barcode: String) {
+        // 检查是否已扫描过该条码
+        if (scannedBarcodes.any { it.barcode == barcode }) {
+            Toast.makeText(this, "该条码已扫描", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val multiFormatWriter = MultiFormatWriter()
+            val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
+            val barcodeEncoder = BarcodeEncoder()
+            val bitmap = barcodeEncoder.createBitmap(bitMatrix)
+            
+            val barcodeItem = BarcodeItem(
+                barcode = barcode,
+                itemName = null,
+                skuName = null,
+                status = "待入库",
+                bitmap = bitmap
+            )
+            
+            // 添加到已扫描列表
+            scannedBarcodes.add(barcodeItem)
+            scannedBarcodeAdapter.submitList(scannedBarcodes.toList())
+
+
+            
+            // 更新待入库列表
+            val currentPendingItems = pendingAdapter.getCurrentList().toMutableList()
+            currentPendingItems.add(barcode)
+            pendingAdapter.updateData(currentPendingItems)
+            
+        } catch (e: Exception) {
+            Toast.makeText(this, "生成条码失败：${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun submitWarehousing() {
+        inboundOrder?.let { order ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val serialNumberList = scannedBarcodes.map { it.barcode } + warehousedBarcodes.map { it.barcode }
+                    val request = ApiService.SubmitReceiptOrderRequest(
+                        bizOrderNo = order.orderNo,
+                        serialNumberList = serialNumberList
+                    )
+
+                    val response = apiService.submitReceiptOrder(request).execute()
+                    
                     withContext(Dispatchers.Main) {
-                        val gson = Gson()
-                        inboundOrder = gson.fromJson(jsonObject, InboundOrder::class.java)
-                        setupUI()
-                        generateBarcode()
+                        if (response.isSuccessful) {
+                            Toast.makeText(this@InboundDetailActivity, "入库成功", Toast.LENGTH_SHORT).show()
+                            // 入库成功后返回上一页
+                            // finish()
+                        } else {
+                            Toast.makeText(this@InboundDetailActivity, "入库失败", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }.onFailure { exception ->
+                } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        handleError(exception as Exception)
+                        handleError(e)
                     }
                 }
-            } catch (e: Exception) {
+            }
+        } ?: Toast.makeText(this, "订单信息不完整", Toast.LENGTH_SHORT).show()
+    }
+
+    private suspend fun loadOrderDetail(orderId: String) {
+        try {
+            val result = getReceiptOrderDetail(orderId)
+            result.onSuccess { jsonObject ->
                 withContext(Dispatchers.Main) {
-                    handleError(e)
+                    val gson = Gson()
+                    val orderResponse = gson.fromJson(jsonObject.get("data"), OrderResponse::class.java)
+                    inboundOrder = InboundOrder(
+                        id = orderResponse.id,
+                        orderNo = orderResponse.orderNo,
+                        optType = orderResponse.optType,
+                        createTime = orderResponse.createTime,
+                        remark = orderResponse.remark,
+                        warehouseId = ""
+                    )
+                    orderDetails = orderResponse.details
+                    
+                    // 更新待入库和已入库列表
+                    // val pendingItems = orderDetails.filter { it.itemStatus == "0" }
+                    //                 .map { it.itemSerialNumber }
+                    // pendingAdapter.updateData(pendingItems)
+                    
+                    val warehousedItems = orderDetails
+                                        .map { detail -> 
+                                            WarehousedItem(
+                                                itemName = detail.itemName,
+                                                skuName = detail.skuName,
+                                                itemSerialNumber = detail.itemSerialNumber,
+                                                itemStatus = detail.itemStatus
+                                            )
+                                        }
+                    warehousedAdapter.updateData(warehousedItems)
+
+                    warehousedBarcodes.addAll(warehousedItems.map { detail ->
+                        BarcodeItem(
+                            barcode = detail.itemSerialNumber,
+                            itemName = detail.itemName,
+                            skuName = detail.skuName,
+                            status = detail.itemStatus,
+                            bitmap = createBarcodeBitmap(detail.itemSerialNumber)
+                        )
+                    })
+                    
+                    setupUI()
                 }
+            }.onFailure { exception ->
+                withContext(Dispatchers.Main) {
+                    handleError(exception as Exception)
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                handleError(e)
             }
         }
     }
@@ -80,56 +294,31 @@ class InboundDetailActivity : AppCompatActivity() {
     private fun setupUI() {
         inboundOrder?.let { order ->
             binding.apply {
-                // 设置订单基本信息
                 tvOrderNo.text = "订单编号：${order.orderNo}"
                 tvCreateTime.text = "创建时间：${order.createTime}"
-                tvStatus.text = "订单状态：${
-                    when(order.orderStatus) {
-                        "0" -> "待审核"
-                        "1" -> "已审核"
-                        "2" -> "已完成"
-                        else -> "未知状态"
-                    }
-                }"
-                tvSupplierName.text = "供应商：${order.supplierName}"
-                tvTotalAmount.text = "总金额：¥${String.format("%.2f", order.totalAmount)}"
-                tvRemark.text = "备注：${order.remark ?: "无"}"
             }
-        }
-    }
-
-    private fun generateBarcode() {
-        try {
-            inboundOrder?.let { order ->
-                val multiFormatWriter = MultiFormatWriter()
-                val bitMatrix: BitMatrix = multiFormatWriter.encode(
-                    order.orderNo,
-                    BarcodeFormat.CODE_128,
-                    800,
-                    200
-                )
-                val barcodeEncoder = BarcodeEncoder()
-                val bitmap: Bitmap = barcodeEncoder.createBitmap(bitMatrix)
-                binding.ivBarcode.setImageBitmap(bitmap)
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "生成条码失败：${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun handleError(e: Exception) {
         Log.e("InboundDetailActivity", "发生错误", e)
-        Toast.makeText(this, "发生错误：${e.message}", Toast.LENGTH_SHORT).show()
     }
 
-    private suspend fun getReceiptOrderDetail(id: Long): Result<JsonObject> {
+    private suspend fun getReceiptOrderDetail(id: String): Result<JsonObject> {
         return withContext(Dispatchers.IO) {
             try {
-                val response: Response<ResponseBody> = apiService.getReceiptOrderDetail(id).execute()
+                val params = mapOf("id" to id)
+                val response: Response<ResponseBody> = apiService.getReceiptOrderDetail(params).execute()
                 if (response.isSuccessful && response.body() != null) {
                     val responseBody = response.body()?.string()
                     val gson = Gson()
                     val result = gson.fromJson(responseBody, JsonObject::class.java)
+                    if(result.get("code").asInt == 500){
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@InboundDetailActivity, "此订单已被他人锁定，请联系管理员解锁", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                    }
                     Result.success(result)
                 } else {
                     Result.failure(HttpException(response))
@@ -138,5 +327,45 @@ class InboundDetailActivity : AppCompatActivity() {
                 Result.failure(e)
             }
         }
+    }
+
+    private fun showExitConfirmDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("提示")
+            .setMessage("确认退出吗？当前数据不会保存")
+            .setPositiveButton("确定") { _, _ ->
+                inboundOrder?.let { order ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            val params = mapOf("orderNo" to order.orderNo)
+                            val response = apiService.closeReceiptOrderLock(params).execute()
+                            withContext(Dispatchers.Main) {
+                                if (!response.isSuccessful)
+                                    Toast.makeText(this@InboundDetailActivity, "释放锁失败", Toast.LENGTH_SHORT).show()
+                                }
+                                finish()
+
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@InboundDetailActivity, "释放锁失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                finish()
+                            }
+                        }
+                    }
+                } ?: finish()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    override fun onBackPressed() {
+        showExitConfirmDialog()
+    }
+
+    private fun createBarcodeBitmap(barcode: String): Bitmap {
+        val multiFormatWriter = MultiFormatWriter()
+        val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
+        val barcodeEncoder = BarcodeEncoder()
+        return barcodeEncoder.createBitmap(bitMatrix)
     }
 }

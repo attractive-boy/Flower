@@ -122,7 +122,7 @@ class LoginActivity : AppCompatActivity() {
     private fun handleLoginError(e: Exception, loading: View, loginButton: View) {
         loading.visibility = View.GONE
         loginButton.isEnabled = true
-        Toast.makeText(this, "发生错误：${e.message}", Toast.LENGTH_SHORT).show()
+
     }
 
     private fun navigateToHome() {

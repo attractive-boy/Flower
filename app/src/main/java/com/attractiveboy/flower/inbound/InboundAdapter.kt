@@ -3,8 +3,8 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.attractiveboy.flower.databinding.ItemInboundOrderBinding
-import com.attractiveboy.flower.inbound.InboundOrder
 import com.attractiveboy.flower.inbound.InboundDetailActivity
+import com.attractiveboy.flower.inbound.InboundOrder
 
 class InboundAdapter<T>(private val inboundList: MutableList<InboundOrder>) :
     RecyclerView.Adapter<InboundAdapter<T>.ViewHolder>() {
@@ -43,27 +43,13 @@ class InboundAdapter<T>(private val inboundList: MutableList<InboundOrder>) :
                 // 设置创建时间
                 tvCreateTime.text = "创建时间：${order.createTime}"
 
-                // 设置订单状态
-                tvStatus.text = when(order.orderStatus) {
-                    "0" -> "待审核"
-                    "1" -> "已审核" 
-                    "2" -> "已完成"
-                    else -> "未知状态"
-                }
 
-                // 设置供应商名称
-                tvSupplierName.text = "供应商：${order.supplierName}"
 
-                // 设置总金额
-                tvTotalAmount.text = "总金额：¥${String.format("%.2f", order.totalAmount)}"
-
-                // 设置备注
-                tvRemark.text = "备注：${order.remark ?: "无"}"
 
                 // 设置点击事件,跳转到详情页面
                 root.setOnClickListener {
                     val intent = Intent(root.context, InboundDetailActivity::class.java)
-                    intent.putExtra("inbound_order", order.id)
+                    intent.putExtra("inbound_order", order.id.toString())
                     root.context.startActivity(intent)
                 }
             }

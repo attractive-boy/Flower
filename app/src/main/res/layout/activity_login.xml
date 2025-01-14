@@ -5,16 +5,16 @@
     android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="32dp"
+    android:padding="24dp"
     android:background="@drawable/background_gradient"
     tools:context=".login.LoginActivity">
 
     <!-- Logo图片 -->
     <ImageView
         android:id="@+id/logo"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:layout_marginTop="48dp"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_marginTop="32dp"
         android:src="@drawable/ic_scan"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -24,10 +24,10 @@
         android:id="@+id/title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:text="昆仑花卉管理系统"
         android:textColor="#3A6EA5"
-        android:textSize="28sp"
+        android:textSize="24sp"
         android:textStyle="bold"
         android:letterSpacing="0.1"
         app:layout_constraintEnd_toEndOf="parent"
@@ -37,16 +37,16 @@
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="8dp"
+        android:layout_marginTop="24dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="6dp"
         app:layout_constraintTop_toBottomOf="@id/title">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="16dp">
 
             <androidx.appcompat.widget.AppCompatEditText
                 android:id="@+id/username"
@@ -54,36 +54,36 @@
                 android:layout_height="wrap_content"
                 android:hint="用户名"
                 android:inputType="textEmailAddress"
-                android:padding="16dp"
+                android:padding="12dp"
                 android:selectAllOnFocus="true"
                 android:drawableLeft="@drawable/ic_username"
-                android:drawablePadding="12dp"
+                android:drawablePadding="8dp"
                 android:background="@drawable/rounded_edittext" />
 
             <androidx.appcompat.widget.AppCompatEditText
                 android:id="@+id/password"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:hint="密码"
                 android:imeOptions="actionDone"
                 android:inputType="textPassword"
-                android:padding="16dp"
+                android:padding="12dp"
                 android:selectAllOnFocus="true"
                 android:drawableLeft="@drawable/ic_password"
-                android:drawablePadding="12dp"
+                android:drawablePadding="8dp"
                 android:background="@drawable/rounded_edittext" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/login"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:padding="16dp"
+                android:layout_marginTop="16dp"
+                android:padding="12dp"
                 android:text="登 录"
-                android:textSize="18sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                app:cornerRadius="12dp"
+                app:cornerRadius="8dp"
                 android:backgroundTint="#3A6EA5" />
 
         </LinearLayout>
@@ -94,7 +94,7 @@
         android:id="@+id/loading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="24dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

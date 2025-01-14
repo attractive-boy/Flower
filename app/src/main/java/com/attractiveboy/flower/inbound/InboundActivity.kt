@@ -1,5 +1,7 @@
 package com.attractiveboy.flower.inbound
 
+import BarcodeListener
+import BarcodeReceiver
 import InboundAdapter
 import android.os.Bundle
 import android.util.Log
@@ -21,8 +23,16 @@ import okhttp3.ResponseBody
 import retrofit2.HttpException
 import retrofit2.Response
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 
-class InboundActivity : AppCompatActivity() {
+class InboundActivity : AppCompatActivity(), BarcodeListener {
     private lateinit var binding: ActivityInboundBinding
     private val apiService: ApiService = RetrofitClient.instance.create(ApiService::class.java)
     private var currentPage = 1
@@ -32,6 +42,7 @@ class InboundActivity : AppCompatActivity() {
     private lateinit var inboundAdapter: InboundAdapter<InboundOrder>
     private val inboundList = mutableListOf<InboundOrder>()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityInboundBinding.inflate(layoutInflater)
@@ -40,9 +51,59 @@ class InboundActivity : AppCompatActivity() {
         // 初始化RetrofitClient
         RetrofitClient.init(this)
 
+
+
+        // 设置返回按钮点击事件
+        binding.toolbar.setNavigationOnClickListener {
+            finish()
+        }
+
         setupUI()
         setupSwipeRefresh()
+        setupSearch()
         loadInboundData()
+    }
+
+    override fun onBarcodeScanned(barcode: String) {
+        // 处理扫描到的条码
+        Log.d("InboundActivity", "扫描到的条码: $barcode")
+
+        currentKeyword = barcode
+        if (currentKeyword != null && currentKeyword != "") {
+            resetAndRefresh()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+    }
+
+    private fun setupSearch() {
+        binding.searchInput.setOnEditorActionListener { v, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || 
+                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+                currentKeyword = binding.searchInput.text.toString().trim()
+                resetAndRefresh()
+                return@setOnEditorActionListener true
+            }
+            false
+        }
+        // 自动获取焦点
+        binding.searchInput.requestFocus()
+
+        binding.searchInput.setSelection(binding.searchInput.text.length)
+
+        // 隐藏软键盘
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.searchInput.windowToken, 0)
+
+        // 设置窗口的软键盘模式
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
+        //失去焦点时自动获取
+        binding.searchInput.setOnFocusChangeListener { v, hasFocus ->
+            binding.searchInput.requestFocus()
+        }
     }
 
     private fun setupUI() {
@@ -123,7 +184,7 @@ class InboundActivity : AppCompatActivity() {
                 result.onSuccess { jsonObject ->
                     withContext(Dispatchers.Main) {
                         binding.swipeRefresh.isRefreshing = false
-                        val rows = jsonObject.getAsJsonArray("rows")
+                        val rows = jsonObject.getAsJsonArray("records")
                         val total = jsonObject.get("total").asInt
 
                         // 解析数据并添加到列表
@@ -176,7 +237,7 @@ class InboundActivity : AppCompatActivity() {
         Log.e("InboundActivity", "发生错误", e)
         binding.swipeRefresh.isRefreshing = false
         isLoading = false
-        Toast.makeText(this, "发生错误：${e.message}", Toast.LENGTH_SHORT).show()
+
     }
 
     suspend fun getReceiptOrderList(
@@ -194,6 +255,7 @@ class InboundActivity : AppCompatActivity() {
                 orderStatus?.let { params["orderStatus"] = it }
                 params["pageSize"] = pageSize.toString()
                 params["pageNum"] = pageNum.toString()
+                params["orderStatus"] = "0"
                 orderByColumn?.let { params["orderByColumn"] = it }
                 isAsc?.let { params["isAsc"] = it }
 

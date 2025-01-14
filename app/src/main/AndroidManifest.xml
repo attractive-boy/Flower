@@ -18,6 +18,9 @@
             android:name=".inbound.InboundDetailActivity"
             android:exported="false" />
         <activity
+            android:name=".outbound.OutboundDetailActivity"
+            android:exported="false" />
+        <activity
             android:name=".outbound.OutboundActivity"
             android:exported="false" />
         <activity
