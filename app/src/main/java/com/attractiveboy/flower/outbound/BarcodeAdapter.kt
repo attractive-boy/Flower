@@ -26,9 +26,7 @@ class BarcodeAdapter : ListAdapter<BarcodeItem, BarcodeAdapter.BarcodeViewHolder
         holder.bind(getItem(position))
     }
 
-    fun submitList(toList: List<BarcodeItem>) {
 
-    }
 
     class BarcodeViewHolder(
         private val binding: ItemBarcodeBinding

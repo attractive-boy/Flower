@@ -3,11 +3,14 @@ package com.attractiveboy.flower.outbound
 import PendingBarcodeAdapter
 import WarehousedBarcodeAdapter
 import WarehousedItem
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -150,8 +153,24 @@ class OutboundDetailActivity : AppCompatActivity() {
                 }
                 true
             } else {
-                false
+                true
             }
+        }
+
+        // 自动获取焦点
+        binding.etBarcode.requestFocus()
+
+        binding.etBarcode.setSelection(binding.etBarcode.text.length)
+
+        // 隐藏软键盘
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.etBarcode.windowToken, 0)
+
+        // 设置窗口的软键盘模式
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
+        //失去焦点时自动获取
+        binding.etBarcode.setOnFocusChangeListener { v, hasFocus ->
+            binding.etBarcode.requestFocus()
         }
     }
 
@@ -206,7 +225,7 @@ class OutboundDetailActivity : AppCompatActivity() {
                 try {
                     val request = ApiService.SubmitShipmentOrderRequest(
                         bizOrderNo = order.orderNo,
-                        serialNumberList = scannedBarcodes.map { it.barcode }
+                        serialNumberList = scannedBarcodes.map { it.barcode } + warehousedBarcodes.map { it.barcode }
                     )
 
                     val response = apiService.submitShipmentOrder(request).execute()
@@ -214,8 +233,9 @@ class OutboundDetailActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (response.isSuccessful) {
                             Toast.makeText(this@OutboundDetailActivity, "出库成功", Toast.LENGTH_SHORT).show()
-                            // 出库成功后返回上一页
-                            finish()
+                            //刷新界面
+                            recreate()
+                            
                         } else {
                             Toast.makeText(this@OutboundDetailActivity, "出库失败", Toast.LENGTH_SHORT).show()
                         }
@@ -261,6 +281,16 @@ class OutboundDetailActivity : AppCompatActivity() {
                                             )
                                         }
                     warehousedAdapter.updateData(warehousedItems)
+
+                    warehousedBarcodes.addAll(warehousedItems.map { detail ->
+                        com.attractiveboy.flower.outbound.BarcodeItem(
+                            barcode = detail.itemSerialNumber,
+                            itemName = detail.itemName,
+                            skuName = detail.skuName,
+                            status = detail.itemStatus,
+                            bitmap = createBarcodeBitmap(detail.itemSerialNumber)
+                        )
+                    })
                     
                     setupUI()
                 }
@@ -345,5 +375,12 @@ class OutboundDetailActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
         showExitConfirmDialog()
+    }
+
+    private fun createBarcodeBitmap(barcode: String): Bitmap {
+        val multiFormatWriter = MultiFormatWriter()
+        val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
+        val barcodeEncoder = BarcodeEncoder()
+        return barcodeEncoder.createBitmap(bitMatrix)
     }
 }

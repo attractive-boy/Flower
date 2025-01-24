@@ -3,12 +3,14 @@ package com.attractiveboy.flower.inbound
 import PendingBarcodeAdapter
 import WarehousedBarcodeAdapter
 import WarehousedItem
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
-import android.widget.TextView
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -18,7 +20,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.attractiveboy.flower.R
 import com.attractiveboy.flower.api.ApiService
 import com.attractiveboy.flower.databinding.ActivityInboundDetailBinding
-import com.attractiveboy.flower.inbound.BarcodeAdapter
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.zxing.BarcodeFormat
@@ -152,8 +153,24 @@ class InboundDetailActivity : AppCompatActivity() {
                 }
                 true
             } else {
-                false
+                true
             }
+        }
+
+        // 自动获取焦点
+        binding.etBarcode.requestFocus()
+
+        binding.etBarcode.setSelection(binding.etBarcode.text.length)
+
+        // 隐藏软键盘
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.etBarcode.windowToken, 0)
+
+        // 设置窗口的软键盘模式
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
+        //失去焦点时自动获取
+        binding.etBarcode.setOnFocusChangeListener { v, hasFocus ->
+            binding.etBarcode.requestFocus()
         }
     }
 
@@ -219,8 +236,11 @@ class InboundDetailActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (response.isSuccessful) {
                             Toast.makeText(this@InboundDetailActivity, "入库成功", Toast.LENGTH_SHORT).show()
-                            // 入库成功后返回上一页
-                            // finish()
+
+                            //刷新界面
+                            recreate()
+
+                            
                         } else {
                             Toast.makeText(this@InboundDetailActivity, "入库失败", Toast.LENGTH_SHORT).show()
                         }

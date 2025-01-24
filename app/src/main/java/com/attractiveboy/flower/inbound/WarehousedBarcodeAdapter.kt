@@ -34,9 +34,17 @@ class WarehousedBarcodeAdapter : RecyclerView.Adapter<WarehousedBarcodeAdapter.V
 
     override fun getItemCount() = items.size
 
-    fun updateData(newItems: List<WarehousedItem>) {
+    fun updateData(newItems: List<WarehousedItem?>) {
         items.clear()
-        items.addAll(newItems)
+        if (newItems.isEmpty()) {
+            return
+        }else{
+            newItems.forEach {
+                if (it != null) {
+                    items.add(it)
+                }
+            }
+        }
         notifyDataSetChanged()
     }
 }
