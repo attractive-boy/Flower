@@ -11,7 +11,11 @@ data class WarehousedItem(
     val itemName: String,
     val skuName: String,
     val itemSerialNumber: String,
-    val itemStatus: String
+    val itemStatus: String,
+    val itemPrice: Double,
+    val itemQuantity: Int,
+    val itemSkuId: String,
+
 )
 
 class WarehousedBarcodeAdapter : RecyclerView.Adapter<WarehousedBarcodeAdapter.ViewHolder>() {

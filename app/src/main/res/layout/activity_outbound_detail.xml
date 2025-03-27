@@ -111,7 +111,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="8dp"
-                        android:text="待出库条码"
+                        android:text="待出库"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="@color/colorPrimary" />
@@ -146,7 +146,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="8dp"
-                        android:text="已出库条码"
+                        android:text="已出库"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#4CAF50" />

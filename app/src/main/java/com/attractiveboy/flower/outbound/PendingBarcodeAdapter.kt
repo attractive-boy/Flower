@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.attractiveboy.flower.R
 
 class PendingBarcodeAdapter : RecyclerView.Adapter<PendingBarcodeAdapter.ViewHolder>() {
-    private val items = mutableListOf<String>()
+    private val items = mutableListOf<BarcodeItem>()
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvBarcode: TextView = view.findViewById(R.id.tvBarcode)
@@ -22,14 +22,14 @@ class PendingBarcodeAdapter : RecyclerView.Adapter<PendingBarcodeAdapter.ViewHol
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val barcode = items[position]
-        holder.tvBarcode.text = "条码: $barcode"
+        holder.tvBarcode.text = "${barcode.itemName} 数量：${barcode.quantity} 单价：${barcode.price}"
     }
 
     override fun getItemCount() = items.size
 
-    fun getCurrentList(): List<String> = items.toList()
+    fun getCurrentList(): List<BarcodeItem> = items.toList()
 
-    fun updateData(newItems: List<String>) {
+    fun updateData(newItems: List<BarcodeItem>) {
         items.clear()
         items.addAll(newItems)
         notifyDataSetChanged()

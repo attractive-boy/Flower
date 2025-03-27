@@ -6,6 +6,7 @@ import retrofit2.http.POST
 import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.QueryMap
 
 interface ApiService {
@@ -48,9 +49,16 @@ interface ApiService {
     fun closeShipmentOrderLock(@QueryMap params: Map<String, String>): Call<ResponseBody>
 
     // 提交出库
+    data class SubmitShipmentOrderDetailReqVo(
+        val skuId: Long,
+        val quantity: Int,
+        val amount: Double,
+        val remark: String? = null
+    )
+
     data class SubmitShipmentOrderRequest(
         val bizOrderNo: String,
-        val serialNumberList: List<String>
+        val details: List<SubmitShipmentOrderDetailReqVo>
     )
 
     @POST("wms/shipmentOrder/submit-shipment-order")
@@ -59,4 +67,9 @@ interface ApiService {
     // 创建出库单
     @POST("wms/shipmentOrder")
     fun createShipmentOrder(@Body jsonBody: Map<String, Any>): Call<ResponseBody>
+
+    //获取出库单条码的详细信息
+    @GET("wms/itemSkuDetail/get-item-sku-detail/{code}")
+    fun getItemSkuDetail(@Path("code") code: String): Call<ResponseBody>
+    
 }

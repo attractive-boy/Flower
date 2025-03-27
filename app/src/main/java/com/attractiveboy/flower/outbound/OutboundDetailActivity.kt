@@ -1,16 +1,18 @@
 package com.attractiveboy.flower.outbound
 
-import PendingBarcodeAdapter
-import WarehousedBarcodeAdapter
-import WarehousedItem
+import com.attractiveboy.flower.outbound.PendingBarcodeAdapter
+import com.attractiveboy.flower.outbound.WarehousedBarcodeAdapter
+import com.attractiveboy.flower.outbound.WarehousedItem
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -40,7 +42,8 @@ data class OrderDetail(
     val skuId: Int,
     val quantity: Int = 1,
     val warehouseId: Int? = null,
-    val optType: Int? = null
+    val optType: Int? = null,
+    val amount: Double? = null
 )
 
 data class OrderResponse(
@@ -59,7 +62,10 @@ data class OutboundOrder(
     val optType: Int,
     val createTime: String,
     val remark: String?,
-    val warehouseId: String
+    val warehouseId: String,
+    val quantity: Int = 1,
+    val price: Float? = null,
+    val skuId: Int? = null
 )
 
 data class BarcodeItem(
@@ -67,7 +73,10 @@ data class BarcodeItem(
     val itemName: String?,
     val skuName: String?,
     val status: String,
-    val bitmap: Bitmap
+    val bitmap: Bitmap,
+    val quantity: Int = 1,
+    val price: Float? = null,
+    val skuId: Int? = null
 )
 
 class OutboundDetailActivity : AppCompatActivity() {
@@ -191,32 +200,74 @@ class OutboundDetailActivity : AppCompatActivity() {
             return
         }
 
-        try {
-            val multiFormatWriter = MultiFormatWriter()
-            val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
-            val barcodeEncoder = BarcodeEncoder()
-            val bitmap = barcodeEncoder.createBitmap(bitMatrix)
-            
-            val barcodeItem = BarcodeItem(
-                barcode = barcode,
-                itemName = null,
-                skuName = null,
-                status = "待出库",
-                bitmap = bitmap
-            )
-            
-            // 添加到已扫描列表
-            scannedBarcodes.add(barcodeItem)
-            scannedBarcodeAdapter.submitList(scannedBarcodes.toList())
-            
-            // 更新待出库列表
-            val currentPendingItems = pendingAdapter.getCurrentList().toMutableList()
-            currentPendingItems.add(barcode)
-            pendingAdapter.updateData(currentPendingItems)
-            
-        } catch (e: Exception) {
-            Toast.makeText(this, "生成条码失败：${e.message}", Toast.LENGTH_SHORT).show()
-        }
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_quantity_price, null)
+        val etQuantity = dialogView.findViewById<EditText>(R.id.etQuantity)
+        val etPrice = dialogView.findViewById<EditText>(R.id.etPrice)
+
+        AlertDialog.Builder(this)
+            .setTitle("输入数量和单价")
+            .setView(dialogView)
+            .setPositiveButton("确定") { _, _ ->
+                val quantity = etQuantity.text.toString().toIntOrNull() ?: 1
+                val price = etPrice.text.toString().toFloatOrNull() ?: 0f
+
+                try {
+                    val multiFormatWriter = MultiFormatWriter()
+                    val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
+                    val barcodeEncoder = BarcodeEncoder()
+                    val bitmap = barcodeEncoder.createBitmap(bitMatrix)
+
+                    // 查询 商品信息 getItemSkuDetail
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            val response = apiService.getItemSkuDetail(barcode).execute()
+                            if (response.isSuccessful && response.body() != null) {
+                                val responseBody = response.body()?.string()
+                                val gson = Gson()
+                                val result = gson.fromJson(responseBody, JsonObject::class.java)
+                                if (result.get("code").asInt == 200) {
+                                    val itemName = result.get("data").asJsonObject.get("itemName").asString
+                                    val skuName = result.get("data").asJsonObject.get("skuName").asString
+                                    val skuId = result.get("data").asJsonObject.get("skuId").asInt
+                                    val barcodeItem = BarcodeItem(
+                                        barcode = barcode,
+                                        itemName = itemName,
+                                        skuName = skuName,
+                                        status = "待出库",
+                                        bitmap = bitmap,
+                                        quantity = quantity,
+                                        price = price * quantity,
+                                        skuId = skuId
+                                    )
+                                    // 添加到已扫描列表
+                                    scannedBarcodes.add(barcodeItem)
+                                    scannedBarcodeAdapter.submitList(scannedBarcodes.toList())
+
+                                    // 更新待出库列表
+                                    withContext(Dispatchers.Main) {
+                                        val currentPendingItems = pendingAdapter.getCurrentList().toMutableList()
+                                        currentPendingItems.add(barcodeItem)
+                                        pendingAdapter.updateData(currentPendingItems)
+                                    }
+
+                                } else {
+
+                                }
+                            } else {
+
+                            }
+                        } catch (e: Exception) {
+                            Log.e("OutboundDetailActivity", "发生错误：${e}")
+
+                        }
+                    }
+                    
+                } catch (e: Exception) {
+                    Toast.makeText(this, "生成条码失败：${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun submitWarehousing() {
@@ -225,7 +276,21 @@ class OutboundDetailActivity : AppCompatActivity() {
                 try {
                     val request = ApiService.SubmitShipmentOrderRequest(
                         bizOrderNo = order.orderNo,
-                        serialNumberList = scannedBarcodes.map { it.barcode } + warehousedBarcodes.map { it.barcode }
+                        details = scannedBarcodes.map { barcodeItem ->
+                            ApiService.SubmitShipmentOrderDetailReqVo(
+                                skuId = barcodeItem.skuName?.toLong() ?: 0,
+                                quantity = barcodeItem.quantity,
+                                amount = barcodeItem.price?.toDouble() ?: 0.0,
+                                remark = null
+                            )
+                        } + warehousedBarcodes.map { barcodeItem ->
+                            ApiService.SubmitShipmentOrderDetailReqVo(
+                                skuId = orderDetails.find { it.itemSerialNumber == barcodeItem.barcode }?.skuId?.toLong()?: 0,
+                                quantity = barcodeItem.quantity,
+                                amount = barcodeItem.price?.toDouble()?: 0.0,
+                                remark = null
+                            )
+                        }
                     )
 
                     val response = apiService.submitShipmentOrder(request).execute()
@@ -256,6 +321,7 @@ class OutboundDetailActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     val gson = Gson()
                     val orderResponse = gson.fromJson(jsonObject.get("data"), OrderResponse::class.java)
+
                     outboundOrder = OutboundOrder(
                         id = orderResponse.id,
                         orderNo = orderResponse.orderNo,
@@ -277,13 +343,19 @@ class OutboundDetailActivity : AppCompatActivity() {
                                                 itemName = detail.itemName,
                                                 skuName = detail.skuName,
                                                 itemSerialNumber = detail.itemSerialNumber,
-                                                itemStatus = detail.itemStatus
+                                                itemStatus = detail.itemStatus,
+                                                itemQuantity = detail.quantity,
+                                                itemPrice = detail.amount ?: 0.0,
+                                                itemSkuId = detail.skuId.toString()
                                             )
                                         }
                     warehousedAdapter.updateData(warehousedItems)
 
                     warehousedBarcodes.addAll(warehousedItems.map { detail ->
                         com.attractiveboy.flower.outbound.BarcodeItem(
+                            quantity = detail.itemQuantity,
+                            price = detail.itemPrice.toFloat(),
+                            skuId = detail.itemSkuId.toInt(),
                             barcode = detail.itemSerialNumber,
                             itemName = detail.itemName,
                             skuName = detail.skuName,
