@@ -225,7 +225,7 @@ class InboundDetailActivity : AppCompatActivity() {
         inboundOrder?.let { order ->
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
-                    val serialNumberList = scannedBarcodes.map { it.barcode } + warehousedBarcodes.map { it.barcode }
+                    val serialNumberList = scannedBarcodes.map { it.barcode }
                     val request = ApiService.SubmitReceiptOrderRequest(
                         bizOrderNo = order.orderNo,
                         serialNumberList = serialNumberList
@@ -235,14 +235,14 @@ class InboundDetailActivity : AppCompatActivity() {
                     
                     withContext(Dispatchers.Main) {
                         if (response.isSuccessful) {
-                            Toast.makeText(this@InboundDetailActivity, "入库成功", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@InboundDetailActivity, "提交成功", Toast.LENGTH_SHORT).show()
 
                             //刷新界面
                             recreate()
 
                             
                         } else {
-                            Toast.makeText(this@InboundDetailActivity, "入库失败", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@InboundDetailActivity, "提交失败", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (e: Exception) {
@@ -333,12 +333,6 @@ class InboundDetailActivity : AppCompatActivity() {
                     val responseBody = response.body()?.string()
                     val gson = Gson()
                     val result = gson.fromJson(responseBody, JsonObject::class.java)
-                    if(result.get("code").asInt == 500){
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@InboundDetailActivity, "此订单已被他人锁定，请联系管理员解锁", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
-                    }
                     Result.success(result)
                 } else {
                     Result.failure(HttpException(response))
@@ -354,25 +348,7 @@ class InboundDetailActivity : AppCompatActivity() {
             .setTitle("提示")
             .setMessage("确认退出吗？当前数据不会保存")
             .setPositiveButton("确定") { _, _ ->
-                inboundOrder?.let { order ->
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        try {
-                            val params = mapOf("orderNo" to order.orderNo)
-                            val response = apiService.closeReceiptOrderLock(params).execute()
-                            withContext(Dispatchers.Main) {
-                                if (!response.isSuccessful)
-                                    Toast.makeText(this@InboundDetailActivity, "释放锁失败", Toast.LENGTH_SHORT).show()
-                                }
-                                finish()
-
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(this@InboundDetailActivity, "释放锁失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                                finish()
-                            }
-                        }
-                    }
-                } ?: finish()
+                finish()
             }
             .setNegativeButton("取消", null)
             .show()

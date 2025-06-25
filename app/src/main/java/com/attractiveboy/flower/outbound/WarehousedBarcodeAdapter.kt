@@ -10,10 +10,10 @@ import com.attractiveboy.flower.R
 data class WarehousedItem(
     val itemName: String,
     val skuName: String,
-    val itemSerialNumber: String,
-    val itemStatus: String,
+    val itemSerialNumber: String?,
+    val itemStatus: String?,
     val itemPrice: Double,
-    val itemQuantity: Int,
+    val itemQuantity: Double,
     val itemSkuId: String,
 
 )
@@ -34,8 +34,8 @@ class WarehousedBarcodeAdapter : RecyclerView.Adapter<WarehousedBarcodeAdapter.V
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        holder.tvItemInfo.text = "${item.itemName} - ${item.skuName}"
-        holder.tvBarcode.text = "条码: ${item.itemSerialNumber}"
+        holder.tvItemInfo.text = "${item.itemName} 数量：${item.itemQuantity} 总价：${item.itemPrice} "
+        // holder.tvBarcode.text = "条码: ${item.itemSerialNumber}"
     }
 
     override fun getItemCount() = items.size

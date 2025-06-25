@@ -37,10 +37,10 @@ import retrofit2.Response
 data class OrderDetail(
     val itemName: String,
     val skuName: String, 
-    val itemSerialNumber: String,
-    val itemStatus: String,
-    val skuId: Int,
-    val quantity: Int = 1,
+    val itemSerialNumber: String?,
+    val itemStatus: String?,
+    val skuId: Long,
+    val quantity: Double = 1.00,
     val warehouseId: Int? = null,
     val optType: Int? = null,
     val amount: Double? = null
@@ -50,33 +50,33 @@ data class OrderResponse(
     val id: Long,
     val orderNo: String,
     val optType: Int,
-    val createTime: String,
-    val remark: String,
-    val warehouseId: Int,
+    val createTime: String?,
+    val remark: String?,
+    val warehouseId: Int?,
     val details: List<OrderDetail>
 )
 
 data class OutboundOrder(
     val id: Long,
     val orderNo: String,
-    val optType: Int,
-    val createTime: String,
+    val optType: Int?,
+    val createTime: String?,
     val remark: String?,
-    val warehouseId: String,
+    val warehouseId: String?,
     val quantity: Int = 1,
     val price: Float? = null,
     val skuId: Int? = null
 )
 
 data class BarcodeItem(
-    val barcode: String,
+    val barcode: String?,
     val itemName: String?,
     val skuName: String?,
-    val status: String,
-    val bitmap: Bitmap,
-    val quantity: Int = 1,
-    val price: Float? = null,
-    val skuId: Int? = null
+    val status: String?,
+    val bitmap: String?,
+    val quantity: Double? = 1.00,
+    val price: Double? = null,
+    val skuId: String? = null
 )
 
 class OutboundDetailActivity : AppCompatActivity() {
@@ -208,7 +208,7 @@ class OutboundDetailActivity : AppCompatActivity() {
             .setTitle("输入数量和单价")
             .setView(dialogView)
             .setPositiveButton("确定") { _, _ ->
-                val quantity = etQuantity.text.toString().toIntOrNull() ?: 1
+                val quantity = etQuantity.text.toString().toDoubleOrNull() ?: 1.00
                 val price = etPrice.text.toString().toFloatOrNull() ?: 0f
 
                 try {
@@ -228,13 +228,13 @@ class OutboundDetailActivity : AppCompatActivity() {
                                 if (result.get("code").asInt == 200) {
                                     val itemName = result.get("data").asJsonObject.get("itemName").asString
                                     val skuName = result.get("data").asJsonObject.get("skuName").asString
-                                    val skuId = result.get("data").asJsonObject.get("skuId").asInt
+                                    val skuId = result.get("data").asJsonObject.get("skuId").asString
                                     val barcodeItem = BarcodeItem(
                                         barcode = barcode,
                                         itemName = itemName,
                                         skuName = skuName,
                                         status = "待出库",
-                                        bitmap = bitmap,
+                                        bitmap = "",
                                         quantity = quantity,
                                         price = price * quantity,
                                         skuId = skuId
@@ -278,16 +278,9 @@ class OutboundDetailActivity : AppCompatActivity() {
                         bizOrderNo = order.orderNo,
                         details = scannedBarcodes.map { barcodeItem ->
                             ApiService.SubmitShipmentOrderDetailReqVo(
-                                skuId = barcodeItem.skuName?.toLong() ?: 0,
+                                skuId = barcodeItem.skuId?.toLong() ?: 0,
                                 quantity = barcodeItem.quantity,
                                 amount = barcodeItem.price?.toDouble() ?: 0.0,
-                                remark = null
-                            )
-                        } + warehousedBarcodes.map { barcodeItem ->
-                            ApiService.SubmitShipmentOrderDetailReqVo(
-                                skuId = orderDetails.find { it.itemSerialNumber == barcodeItem.barcode }?.skuId?.toLong()?: 0,
-                                quantity = barcodeItem.quantity,
-                                amount = barcodeItem.price?.toDouble()?: 0.0,
                                 remark = null
                             )
                         }
@@ -297,12 +290,12 @@ class OutboundDetailActivity : AppCompatActivity() {
                     
                     withContext(Dispatchers.Main) {
                         if (response.isSuccessful) {
-                            Toast.makeText(this@OutboundDetailActivity, "出库成功", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@OutboundDetailActivity, "提交成功", Toast.LENGTH_SHORT).show()
                             //刷新界面
                             recreate()
                             
                         } else {
-                            Toast.makeText(this@OutboundDetailActivity, "出库失败", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@OutboundDetailActivity, "提交失败", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (e: Exception) {
@@ -354,13 +347,13 @@ class OutboundDetailActivity : AppCompatActivity() {
                     warehousedBarcodes.addAll(warehousedItems.map { detail ->
                         com.attractiveboy.flower.outbound.BarcodeItem(
                             quantity = detail.itemQuantity,
-                            price = detail.itemPrice.toFloat(),
-                            skuId = detail.itemSkuId.toInt(),
+                            price = detail.itemPrice.toDouble(),
+                            skuId = detail.itemSkuId.toString(),
                             barcode = detail.itemSerialNumber,
                             itemName = detail.itemName,
                             skuName = detail.skuName,
                             status = detail.itemStatus,
-                            bitmap = createBarcodeBitmap(detail.itemSerialNumber)
+                            bitmap = detail.itemSerialNumber
                         )
                     })
                     
@@ -382,7 +375,7 @@ class OutboundDetailActivity : AppCompatActivity() {
         outboundOrder?.let { order ->
             binding.apply {
                 tvOrderNo.text = "订单编号：${order.orderNo}"
-                tvCreateTime.text = "创建时间：${order.createTime}"
+               // tvCreateTime.text = "创建时间：${order.createTime}"
             }
         }
     }
@@ -400,12 +393,6 @@ class OutboundDetailActivity : AppCompatActivity() {
                     val responseBody = response.body()?.string()
                     val gson = Gson()
                     val result = gson.fromJson(responseBody, JsonObject::class.java)
-                    if(result.get("code").asInt == 500){
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@OutboundDetailActivity, "此订单已被他人锁定，请联系管理员解锁", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
-                    }
                     Result.success(result)
                 } else {
                     Result.failure(HttpException(response))
@@ -421,25 +408,7 @@ class OutboundDetailActivity : AppCompatActivity() {
             .setTitle("提示")
             .setMessage("确认退出吗？当前数据不会保存")
             .setPositiveButton("确定") { _, _ ->
-                outboundOrder?.let { order ->
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        try {
-                            val params = mapOf("orderNo" to order.orderNo)
-                            val response = apiService.closeShipmentOrderLock(params).execute()
-                            withContext(Dispatchers.Main) {
-                                if (!response.isSuccessful)
-                                    Toast.makeText(this@OutboundDetailActivity, "释放锁失败", Toast.LENGTH_SHORT).show()
-                                }
-                                finish()
-
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(this@OutboundDetailActivity, "释放锁失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                                finish()
-                            }
-                        }
-                    }
-                } ?: finish()
+                finish()
             }
             .setNegativeButton("取消", null)
             .show()
@@ -449,10 +418,7 @@ class OutboundDetailActivity : AppCompatActivity() {
         showExitConfirmDialog()
     }
 
-    private fun createBarcodeBitmap(barcode: String): Bitmap {
-        val multiFormatWriter = MultiFormatWriter()
-        val bitMatrix = multiFormatWriter.encode(barcode, BarcodeFormat.CODE_128, 800, 200)
-        val barcodeEncoder = BarcodeEncoder()
-        return barcodeEncoder.createBitmap(bitMatrix)
+    private fun createBarcodeBitmap(barcode: String?): String? {
+        return barcode;
     }
 }

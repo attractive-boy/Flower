@@ -51,7 +51,7 @@ interface ApiService {
     // 提交出库
     data class SubmitShipmentOrderDetailReqVo(
         val skuId: Long,
-        val quantity: Int,
+        val quantity: Double?,
         val amount: Double,
         val remark: String? = null
     )
